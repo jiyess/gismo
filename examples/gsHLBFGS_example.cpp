@@ -1501,7 +1501,7 @@ int main(int argc, char* argv[])
 
 	gsStopwatch stopwatch;
 	//bool success = opt.compute();
-	opt.solve();
+//	opt.solve();
 	gsDebug << "running time : " << stopwatch.stop() << "\n";
 
 	/*gsInfo << "inital guess = " << initU << "\n";
