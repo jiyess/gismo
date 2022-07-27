@@ -1531,16 +1531,16 @@ int main(int argc, char* argv[])
 
 	// TODO: other formats? To make it easy to visulization
 
-	gsMultiPatch<> mp = opt.outputResult();
-
-	gsFileData<> fd;
-	fd << mp;
-	fd.save(filename_output);
-	gsInfo << "Wrote G+Smo file:     " << filename_output << ".xml \n";
-
-	gsWriteParaview(mp, "mp", 1000, true, true);
-
-	gsWrite(mp, filename_output);
+//	gsMultiPatch<> mp = opt.outputResult();
+//
+//	gsFileData<> fd;
+//	fd << mp;
+//	fd.save(filename_output);
+//	gsInfo << "Wrote G+Smo file:     " << filename_output << ".xml \n";
+//
+//	gsWriteParaview(mp, "mp", 1000, true, true);
+//
+//	gsWrite(mp, filename_output);
 	//--------------------------------------------------------------------------------------------------
 
 
