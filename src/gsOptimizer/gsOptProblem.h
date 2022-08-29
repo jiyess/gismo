@@ -56,16 +56,25 @@ public:
         for ( index_t i = 0; i!=n; i++ )
         {
             // to do: add m_desLowerBounds m_desUpperBounds check
-            tmp[i]  += T(0.00001);
-            const T e1 = this->evalObj(ctmp);
-            tmp[i]   = u[i] + T(0.00002);
-            const T e3 = this->evalObj(ctmp);
-            tmp[i]   = u[i] - T(0.00001);
+//          central finite difference for gradient check
+            T stepSize = 1e-6;
+            tmp[i]   = u[i] + T(stepSize);
             const T e2 = this->evalObj(ctmp);
-            tmp[i]   = u[i] - T(0.00002);
-            const T e4 = this->evalObj(ctmp);
+            tmp[i]   = u[i] - T(stepSize);
+            const T e1 = this->evalObj(ctmp);
             tmp[i]   = u[i];
-            result[c++]= ( 8 * (e1 - e2) + e4 - e3 ) / T(0.00012);
+            result[c++]= ( e2-e1 ) / (2*T(stepSize));
+
+            // what is this?? -- Ye
+//            const T e1 = this->evalObj(ctmp);
+//            tmp[i]   = u[i] + T(0.00002);
+//            const T e3 = this->evalObj(ctmp);
+//            tmp[i]   = u[i] - T(0.00001);
+//            const T e2 = this->evalObj(ctmp);
+//            tmp[i]   = u[i] - T(0.00002);
+//            const T e4 = this->evalObj(ctmp);
+//            tmp[i]   = u[i];
+//            result[c++]= ( 8 * (e1 - e2) + e4 - e3 ) / T(0.00012);
         }
     }
 

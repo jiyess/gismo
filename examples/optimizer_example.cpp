@@ -204,9 +204,6 @@ int main(int argc, char* argv[])
     }
 
 
-
-
-
     //optimizer->setObjective(op); //gdc
     //optimizer->setErrorFunction(op); //lsq
 
@@ -241,7 +238,7 @@ int main(int argc, char* argv[])
     optimizer->options().setInt("Verbose",14);
 
     gsVector<> in(2);
-    in << 0.5, 1.5;        
+    in << 0.5, 1.5;
 
     // Start the optimization
     optimizer->solve(in);

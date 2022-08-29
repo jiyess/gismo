@@ -132,9 +132,11 @@ template<class E> class inv_expr;
 template<class E, bool cw = false> class tr_expr;
 template<class E> class cb_expr;
 template<class E> class abs_expr;
+template<class E> class heaviside_expr;
 template<class E> class pow_expr;
 template<class E> class sign_expr;
 template<class E> class ppart_expr;
+template<class E> class ppartval_expr;
 template<class T> class cdiam_expr;
 template<class E> class temp_expr;
 template<class E1, class E2, bool = E1::ColBlocks && !E1::ScalarValued && !E2::ScalarValued> class mult_expr
@@ -245,6 +247,8 @@ public:
     /// Returns the expression's positive part
     ppart_expr<E> ppart() const
     { return ppart_expr<E>(static_cast<E const&>(*this)); }
+    ppartval_expr<E> ppartval() const
+    { return ppartval_expr<E>(static_cast<E const&>(*this)); }
 
     /// Returns an evaluation of the (sub-)expression in temporary memory
     temp_expr<E> temp() const
@@ -2204,6 +2208,36 @@ public:
     void print(std::ostream &os) const { os<<"posPart("; _u.print(os); os <<")"; }
 };
 
+template<class E>
+class ppartval_expr : public _expr<ppartval_expr<E> >
+{
+    typename E::Nested_t _u;
+public:
+    typedef typename E::Scalar Scalar;
+    enum {ScalarValued = 1, Space = 0, ColBlocks= 0};
+    mutable Scalar res;
+public:
+
+    ppartval_expr(_expr<E> const& u) : _u(u) { }
+
+    Scalar & eval(index_t k) const
+    {
+        res = std::max(0.0,_u.eval(k));
+        return res; // component-wise maximum with zero
+    }
+
+
+    const index_t rows() const { return 0; }
+    const index_t cols() const { return 0; }
+
+    void parse(gsExprHelper<Scalar> & evList) const
+    { _u.parse(evList); }
+
+    const gsFeSpace<Scalar> & rowVar() const {return gsNullExpr<Scalar>::get();}
+    const gsFeSpace<Scalar> & colVar() const {return gsNullExpr<Scalar>::get();}
+
+    void print(std::ostream &os) const { os<<"posPart("; _u.print(os); os <<")"; }
+};
 
 template<class E>
 class pow_expr : public _expr<pow_expr<E> >
@@ -2430,6 +2464,35 @@ private:
     template<class U> static inline
     typename util::enable_if<!U::ScalarValued,gsMatrix<Scalar> >::type
     eval_impl(const U & u, const index_t k) { return u.eval(k).cwiseAbs(); }
+};
+
+template<class E>
+class heaviside_expr  : public _expr<heaviside_expr<E> >
+{
+    typename E::Nested_t _u;
+
+public:
+    typedef typename E::Scalar Scalar;
+    explicit heaviside_expr(_expr<E> const& u) : _u(u) { }
+
+public:
+    enum {Space= 0, ScalarValued= 1, ColBlocks= 0};
+
+    Scalar eval(const index_t k) const
+    {return _u.eval(k) > 0 ? 1 : 0; }
+
+    index_t rows() const { return _u.rows(); }
+    index_t cols() const { return _u.cols(); }
+    void parse(gsExprHelper<Scalar> & evList) const
+    { _u.parse(evList); }
+
+    static bool isScalar() { return true; }
+
+    const gsFeSpace<Scalar> & rowVar() const {return gsNullExpr<Scalar>::get();}
+    const gsFeSpace<Scalar> & colVar() const {return gsNullExpr<Scalar>::get();}
+
+    void print(std::ostream &os) const { _u.print(os); }
+
 };
 
 /*
@@ -4199,6 +4262,10 @@ EIGEN_STRONG_INLINE idMat_expr id(const index_t dim) { return idMat_expr(dim); }
 /// Absolute value
 template<class E> EIGEN_STRONG_INLINE
 abs_expr<E> abs(const E & u) { return abs_expr<E>(u); }
+
+/// Heaviside heaviside_expr
+template<class E> EIGEN_STRONG_INLINE
+heaviside_expr<E> heaviside(const E & u) { return heaviside_expr<E>(u); }
 
 /// The gradient of a variable
 template<class E> EIGEN_STRONG_INLINE

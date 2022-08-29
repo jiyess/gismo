@@ -199,6 +199,228 @@ using namespace gismo;
 //     using gsOptProblem<T>::m_curDesign;
 // };
 
+//template<short_t d, typename T>
+//class gsObjInterFreeFunc : public gsOptProblem<T> {
+//    typedef gsExprAssembler<>::geometryMap geometryMap;
+//    typedef gsExprAssembler<>::space space;
+//    typedef gsExprAssembler<>::solution solution;
+//
+//    using Base = gsOptProblem<T>;
+//public:
+//    gsObjInterFreeFunc(const gsMultiPatch<T> &patches,
+//                       const gsDofMapper &mapper,
+//                       const T eps
+//    )
+//            :
+//            m_mp(patches),
+//            m_mapper(mapper),
+//            m_mb(m_mp),
+//            m_patchID(0),
+//            m_eps(eps) {
+//
+//        // What does the following part mean? seems useless...
+//
+//        // parameters related with design variables
+//        // Number of design variables
+//        m_numDesignVars = m_mapper.freeSize();
+//
+//        m_desLowerBounds.resize(m_numDesignVars);
+//        m_desUpperBounds.resize(m_numDesignVars);
+//
+//        // parameters related with constraints
+//        // There is no constraint in our method
+//        m_numConstraints = 0;
+//
+//        m_conLowerBounds.resize(m_numConstraints);
+//        m_conUpperBounds.resize(m_numConstraints);
+//        //m_conLowerBounds[0] = m_conUpperBounds[0] = 0;
+//
+//        // parameters related with nonzero entries in the Constraint Jacobian
+//        // this->currentDesign_into(mp, m_curDesign);
+//        m_numConJacNonZero = m_numDesignVars;
+//        m_conJacRows.resize(m_numConJacNonZero);
+//        m_conJacCols.resize(m_numConJacNonZero);
+//        m_curDesign = convert_mp_to_gsvec(m_mp);
+//
+//        m_assembler.setIntegrationElements(m_mb);
+//        space u = m_assembler.getSpace(m_mb, d); // 1D space!!
+//        m_evaluator = gsExprEvaluator<T>(m_assembler);
+//
+//        m_lambda1 = 1.0;
+//        m_lambda2 = 0.0;
+//    }
+//
+//    T evalObj(const gsAsConstVector<T> &u) const {
+//        T F = 0;
+//        gsMultiPatch<T> mp = m_mp;
+//        this->convert_design_to_mp(u, mp);
+//
+//        geometryMap G = m_evaluator.getMap(mp);
+//
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_evaluator.getVariable(lambda1);
+//        auto lam2 = m_evaluator.getVariable(lambda2);
+//
+//        // Q: here, need some extra calculation?
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Euniform = gismo::expr::pow(jac(G).det(), 2);// or pow(jac(G).det() / S - 1,2) --> what is S?
+//
+//        // if (d==2)
+//        F = m_evaluator.integral(lam1 * Ewinslow.val() + lam2 * Euniform);
+//
+//        // else if (d==3)
+//
+//        return F;
+//    }
+//
+//
+//    void gradObj2_into(const gsAsConstVector<T> &u, gsAsVector<T> &result) const {
+//        gsMultiPatch<T> mp = m_mp;
+//        this->convert_design_to_mp(u, mp);
+//        geometryMap G = m_assembler.getMap(mp);
+//
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_assembler.getCoeff(lambda1);
+//        auto lam2 = m_assembler.getCoeff(lambda2);
+//
+//        space space = m_assembler.getSpace(m_mb, d); // 1D space!!
+//        space.setupMapper(m_mapper);
+//
+//        m_evaluator = gsExprEvaluator<T>(m_assembler);
+//        T area = m_evaluator.integral(meas(G));
+//        gsConstantFunction<T> area_fun(area, d);
+//        auto S = m_assembler.getCoeff(area_fun);
+//
+//        // CHECK INVERSES OF jac(G)
+//        auto JTG = (jac(space) % jac(G));//.tr(); // transpose to switch to rowSpace
+//        auto JiG = (jac(space) % jac(G).inv());//.tr(); // transpose to switch to rowSpace
+//        auto J_prime = jac(G).det() * JiG;
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Ewinslow_der1 = (2.0 / jac(G).det()) * JTG;//
+//        auto Ewinslow_der2 = -(Ewinslow.val() / jac(G).det()) * J_prime;
+//        auto Ewinslow_der = Ewinslow_der1 + Ewinslow_der2;
+//        auto Euniform_der = 2.0 / pow(S, 2) * (jac(G).det().val() - S.val()) * J_prime;
+//
+//
+//        // To evaluate expressions at the point 'pt', use the following
+//        gsVector<T> pt(2);
+//        pt.setConstant(0.5);
+//        gsDebugVar(m_evaluator.eval(G, pt));
+////        gsDebugVar(m_evaluator.eval(jac(space), pt));
+////        gsDebugVar(m_evaluator.eval(jac(G), pt));
+////        gsDebugVar(m_evaluator.eval(JTG, pt));
+////        gsDebugVar(JTG.Space);
+////        gsDebugVar(m_evaluator.eval(JiG, pt));
+////        gsDebugVar(JiG.Space);
+////
+////        gsDebugVar(m_evaluator.eval(J_prime, pt));
+////
+////        gsDebugVar(m_evaluator.eval(Ewinslow, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der1, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der2, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der, pt));
+////        gsDebugVar(m_evaluator.eval(Euniform_der, pt));
+//
+//        m_assembler.initSystem();
+//        m_assembler.assemble(m_lambda1 * Ewinslow_der + m_lambda2 * Euniform_der);
+//        result = gsAsVector<T>(const_cast<T *>(m_assembler.rhs().data()), m_assembler.rhs().rows());
+//    }
+//
+//protected:
+//    void convert_design_to_mp(const gsAsConstVector<T> &u, gsMultiPatch<T> &mp) const {
+//        // Make the geometry
+//        index_t idx;
+//        for (size_t i = 0; i != mp.nPatches(); i++) {
+//            for (size_t c = 0; c != mp.targetDim(); c++) {
+//                for (index_t k = 0; k != m_mapper.patchSize(i, c); k++)
+//
+//                    // if it is possible to just loop over the free index
+//                    // since this function is called very often during optimization
+//                    if (m_mapper.is_free(k, i, c)) {
+//                        idx = m_mapper.index(k, i, c);
+//                        mp.patch(i).coefs()(k, c) = u[idx];
+//                    }
+//            }
+//        }
+//    }
+//
+//    gsVector<T> convert_mp_to_gsvec(const gsMultiPatch<T> &mp) const {
+//        // TODO: Now, it just set all free variables into the vector u
+//        // I will integrate it with the initialization step
+//
+//        gsVector<T> currentDesign(m_mapper.freeSize());
+//
+//        index_t idx;
+//        for (size_t i = 0; i != mp.nPatches(); i++) {
+//            for (size_t c = 0; c != mp.targetDim(); c++) {
+//                for (index_t k = 0; k != m_mapper.patchSize(i, c); k++)
+//                    // if it is possible to just loop over the free index
+//                    // since this function is called very often during optimization
+//                    if (m_mapper.is_free(k, i, c)) {
+//                        idx = m_mapper.index(k, i, c);
+//                        currentDesign(idx) = mp.patch(i).coefs()(k, c);
+//                    }
+//            }
+//        }
+//
+//        return currentDesign;
+//    }
+//
+//protected:
+//    gsMultiPatch<T> m_mp;
+//    gsDofMapper m_mapper;
+//    index_t m_patchID;
+//
+//    gsMultiBasis<T> m_mb;
+//
+//    mutable gsExprEvaluator<T> m_evaluator;
+//    mutable gsExprAssembler<T> m_assembler;
+//
+//    gsOptionList m_options;
+//    T m_lambda1, m_lambda2;
+//
+//
+//    /// Number of design variables
+//    using Base::m_numDesignVars;
+//
+//    /// Number of constraints
+//    using Base::m_numConstraints;
+//
+//    /// Number of nonzero entries in the Constraint Jacobian
+//    using Base::m_numConJacNonZero;
+//
+//    /// Lower bounds for the design variables
+//    using Base::m_desLowerBounds;
+//
+//    /// Upper bounds for the design variables
+//    using Base::m_desUpperBounds;
+//
+//    /// Lower bounds for the constraints
+//    using Base::m_conLowerBounds;
+//
+//    /// Upper bounds for the constraints
+//    using Base::m_conUpperBounds;
+//
+//    /// Constraint Jacobian non-zero entries rows
+//    using Base::m_conJacRows;
+//
+//    /// Constraint Jacobian non-zero entries columns
+//    using Base::m_conJacCols;
+//
+//    /// Current design variables (and starting point )
+//    using Base::m_curDesign;
+//
+//    mutable gsMatrix<T> m_allBasisVal;
+//    mutable gsMatrix<T> m_allBasis1stDervs;
+//    mutable gsMatrix<T> m_allBasis2ndDervs;
+//    mutable gsMatrix<T> m_gaussWts;
+//    mutable gsMatrix<index_t> m_gaussIdx;
+//
+//    T m_eps; // need to handle later, set m_eps = 0.05*S
+//};
+
 template<short_t d, typename T>
 class gsObjInterFreeFunc : public gsOptProblem<T> {
     typedef gsExprAssembler<>::geometryMap geometryMap;
@@ -217,6 +439,9 @@ public:
             m_mb(m_mp),
             m_patchID(0),
             m_eps(eps) {
+
+        // What does the following part mean? seems useless...
+
         // parameters related with design variables
         // Number of design variables
         m_numDesignVars = m_mapper.freeSize();
@@ -254,74 +479,141 @@ public:
 
         geometryMap G = m_evaluator.getMap(mp);
 
-        gsConstantFunction<T> lambda1(m_lambda1, d);
-        gsConstantFunction<T> lambda2(m_lambda2, d);
-        auto lam1 = m_evaluator.getVariable(lambda1);
-        auto lam2 = m_evaluator.getVariable(lambda2);
+        //ReLU, Rectified Linear Unit, how to implement?
 
-        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
-        auto Euniform = gismo::expr::pow(jac(G).det(), 2);// or pow(jac(G).det() / S - 1,2) --> what is S?
+//        auto jacGdet = jac(G).det();
+//        auto EfoldElimination = jacGdet;//.val();
+        auto EfoldElimination = (m_eps-jac(G).det()).ppartval();//.val();
+
+//        gsDebugVar(m_eps);
+
+        // 这里需要一个指示函数，目前只对不为0的部分做测试
+//        gsConstantFunction<T> lambda1(-0.5, d);
+//        auto lam1 = m_evaluator.getVariable(lambda1);
+//        auto EfoldElimination = jac(G).det();
+//        gsVector<T> pt(2);
+//        pt.setConstant(0.3);
+//        gsDebugVar(m_evaluator.eval(EfoldElimination, pt));
+//        gsDebugVar(m_evaluator.eval(m_eps-jac(G).det(), pt));
+
+//        auto EfoldElimination = jac(G).det() * jac(G).det(); // for test purpose
+        F = m_evaluator.integral(EfoldElimination);
+//          F=0;
+        // Here, what is the meaning?
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_evaluator.getVariable(lambda1);
+//        auto lam2 = m_evaluator.getVariable(lambda2);
+
+        // Q: here, need some extra calculation?
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Euniform = gismo::expr::pow(jac(G).det(), 2);// or pow(jac(G).det() / S - 1,2) --> what is S?
 
         // if (d==2)
-        F = m_evaluator.integral(lam1 * Ewinslow.val() + lam2 * Euniform);
+//        F = m_evaluator.integral(lam1 * Ewinslow.val() + lam2 * Euniform);
 
         // else if (d==3)
 
         return F;
     }
 
-
     void gradObj_into(const gsAsConstVector<T> &u, gsAsVector<T> &result) const {
         gsMultiPatch<T> mp = m_mp;
         this->convert_design_to_mp(u, mp);
         geometryMap G = m_assembler.getMap(mp);
 
-        gsConstantFunction<T> lambda1(m_lambda1, d);
-        gsConstantFunction<T> lambda2(m_lambda2, d);
-        auto lam1 = m_assembler.getCoeff(lambda1);
-        auto lam2 = m_assembler.getCoeff(lambda2);
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_assembler.getCoeff(lambda1);
+//        auto lam2 = m_assembler.getCoeff(lambda2);
 
         space space = m_assembler.getSpace(m_mb, d); // 1D space!!
         space.setupMapper(m_mapper);
 
-        m_evaluator = gsExprEvaluator<T>(m_assembler);
-        T area = m_evaluator.integral(meas(G));
-        gsConstantFunction<T> area_fun(area, d);
-        auto S = m_assembler.getCoeff(area_fun);
+// 问题应该就在这!!
+//        gsMultiBasis<> basis(m_mb);
+//        space space = m_assembler.getSpace(basis, 1); // 1D space!!
+//        space.setupMapper(m_mapper);
 
-        // CHECK INVERSES OF jac(G)
-        auto JTG = (jac(space) % jac(G));//.tr(); // transpose to switch to rowSpace
-        auto JiG = (jac(space) % jac(G).inv());//.tr(); // transpose to switch to rowSpace
-        auto J_prime = jac(G).det() * JiG;
-        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
-        auto Ewinslow_der1 = (2.0 / jac(G).det()) * JTG;//
-        auto Ewinslow_der2 = -(Ewinslow.val() / jac(G).det()) * J_prime;
-        auto Ewinslow_der = Ewinslow_der1 + Ewinslow_der2;
-        auto Euniform_der = 2.0 / pow(S, 2) * (jac(G).det().val() - S.val()) * J_prime;
+//        m_evaluator = gsExprEvaluator<T>(m_assembler);
+//        T area = m_evaluator.integral(meas(G));
+//        gsConstantFunction<T> area_fun(area, d);
+//        auto S = m_assembler.getCoeff(area_fun);
 
+//        gsVector<T> pt(2);
+////        pt.setConstant(0.3);
+//        pt(0) = 0.177459666924148;
+//        pt(1) = 0.141967733539319;
+//        gsDebugVar(pt);
 
-        // To evaluate expressions at the point 'pt', use the following
-        gsVector<T> pt(2);
-        pt.setConstant(0.5);
-        gsDebugVar(m_evaluator.eval(G, pt));
-        gsDebugVar(m_evaluator.eval(jac(space), pt));
-        gsDebugVar(m_evaluator.eval(jac(G), pt));
-        gsDebugVar(m_evaluator.eval(JTG, pt));
-        gsDebugVar(JTG.Space);
-        gsDebugVar(m_evaluator.eval(JiG, pt));
-        gsDebugVar(JiG.Space);
+        // what is jac(space)?? we need the derivatives of basis functions, not space
+//        auto basisDers = jac(space);
+//        auto adjJac = jac(G).tr().adj();
+//        gsDebugVar(m_evaluator.eval(basisDers, pt));
+//        gsDebugVar(m_evaluator.eval(adjJac, pt));
+//        auto jacG = jac(G);
+//        gsDebugVar(m_evaluator.eval(jacG, pt));
+//        auto invJac = jac(G).inv();
+//        gsDebugVar(m_evaluator.eval(invJac, pt));
 
-        gsDebugVar(m_evaluator.eval(J_prime, pt));
+//      |J|' w.r.t. physical coordinates x and y
+        auto derJacDet = jac(space) % jac(G).tr().adj();
+//        gsDebugVar(m_evaluator.eval(basisDersTest, pt));
+//        gsDebugVar(jac(space).rows());
+//        gsDebugVar(jac(space).cols());
 
-        gsDebugVar(m_evaluator.eval(Ewinslow, pt));
-        gsDebugVar(m_evaluator.eval(Ewinslow_der1, pt));
-        gsDebugVar(m_evaluator.eval(Ewinslow_der2, pt));
-        gsDebugVar(m_evaluator.eval(Ewinslow_der, pt));
-        gsDebugVar(m_evaluator.eval(Euniform_der, pt));
+//      这个有用！！！！
+//        auto adjTest = jac(G).adj();
+//        gsDebugVar(m_evaluator.eval(adjTest, pt));
 
+//        auto jacTest = jac(G).inv()*jac(G).det();
+//        gsDebugVar(m_evaluator.eval(jacTest,pt));
+
+        // TODO:下面这行先这么写，回头修改掉(出于效率考虑)，引入新的expression？
+//        auto indicator = (m_eps-jac(G).det()).ppartval()/(1e-12-(m_eps-jac(G).det()).ppartval());
+        auto indicator =  -heaviside(m_eps-jac(G).det());
+        auto E_der = indicator * derJacDet;
+//        gsDebugVar(m_evaluator.eval(E_der, pt));
+
+//     现在看来可能是这里有问题？？跟Hugo讨论一下！
         m_assembler.initSystem();
-        m_assembler.assemble(m_lambda1 * Ewinslow_der + m_lambda2 * Euniform_der);
+        m_assembler.assemble(E_der);
+//        gsDebugVar(m_assembler.matrix());
         result = gsAsVector<T>(const_cast<T *>(m_assembler.rhs().data()), m_assembler.rhs().rows());
+
+
+//        // CHECK INVERSES OF jac(G)
+//        auto JTG = (jac(space) % jac(G));//.tr(); // transpose to switch to rowSpace
+//        auto JiG = (jac(space) % jac(G).inv());//.tr(); // transpose to switch to rowSpace
+//        auto J_prime = jac(G).det() * JiG;
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Ewinslow_der1 = (2.0 / jac(G).det()) * JTG;//
+//        auto Ewinslow_der2 = -(Ewinslow.val() / jac(G).det()) * J_prime;
+//        auto Ewinslow_der = Ewinslow_der1 + Ewinslow_der2;
+//        auto Euniform_der = 2.0 / pow(S, 2) * (jac(G).det().val() - S.val()) * J_prime;
+//
+//        // To evaluate expressions at the point 'pt', use the following
+////        gsVector<T> pt(2);
+////        pt.setConstant(0.5);
+////        gsDebugVar(m_evaluator.eval(G, pt));
+////        gsDebugVar(m_evaluator.eval(jac(space), pt));
+////        gsDebugVar(m_evaluator.eval(jac(G), pt));
+////        gsDebugVar(m_evaluator.eval(JTG, pt));
+////        gsDebugVar(JTG.Space);
+////        gsDebugVar(m_evaluator.eval(JiG, pt));
+////        gsDebugVar(JiG.Space);
+////
+////        gsDebugVar(m_evaluator.eval(J_prime, pt));
+////
+////        gsDebugVar(m_evaluator.eval(Ewinslow, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der1, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der2, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der, pt));
+////        gsDebugVar(m_evaluator.eval(Euniform_der, pt));
+//
+//        m_assembler.initSystem();
+//        m_assembler.assemble(m_lambda1 * Ewinslow_der + m_lambda2 * Euniform_der);
+//        result = gsAsVector<T>(const_cast<T *>(m_assembler.rhs().data()), m_assembler.rhs().rows());
     }
 
 protected:
@@ -417,6 +709,324 @@ protected:
     T m_eps; // need to handle later, set m_eps = 0.05*S
 };
 
+template<short_t d, typename T>
+class gsObjQualityImprovePt : public gsOptProblem<T> {
+    typedef gsExprAssembler<>::geometryMap geometryMap;
+    typedef gsExprAssembler<>::space space;
+    typedef gsExprAssembler<>::solution solution;
+
+    using Base = gsOptProblem<T>;
+public:
+    gsObjQualityImprovePt(const gsMultiPatch<T> &patches,
+                       const gsDofMapper &mapper,
+                       const T eps
+    )
+            :
+            m_mp(patches),
+            m_mapper(mapper),
+            m_mb(m_mp),
+            m_patchID(0),
+            m_eps(eps) {
+
+        // What does the following part mean? seems useless...
+
+        // parameters related with design variables
+        // Number of design variables
+        m_numDesignVars = m_mapper.freeSize();
+
+        m_desLowerBounds.resize(m_numDesignVars);
+        m_desUpperBounds.resize(m_numDesignVars);
+
+        // parameters related with constraints
+        // There is no constraint in our method
+        m_numConstraints = 0;
+
+        m_conLowerBounds.resize(m_numConstraints);
+        m_conUpperBounds.resize(m_numConstraints);
+        //m_conLowerBounds[0] = m_conUpperBounds[0] = 0;
+
+        // parameters related with nonzero entries in the Constraint Jacobian
+        // this->currentDesign_into(mp, m_curDesign);
+        m_numConJacNonZero = m_numDesignVars;
+        m_conJacRows.resize(m_numConJacNonZero);
+        m_conJacCols.resize(m_numConJacNonZero);
+        m_curDesign = convert_mp_to_gsvec(m_mp);
+
+        m_assembler.setIntegrationElements(m_mb);
+        space u = m_assembler.getSpace(m_mb, d); // 1D space!!
+        m_evaluator = gsExprEvaluator<T>(m_assembler);
+
+        m_lambda1 = 1.0;
+        m_lambda2 = 0.0;
+    }
+
+    T evalObj(const gsAsConstVector<T> &u) const {
+        T F = 0;
+        gsMultiPatch<T> mp = m_mp;
+        this->convert_design_to_mp(u, mp);
+
+        geometryMap G = m_evaluator.getMap(mp);
+
+        //ReLU, Rectified Linear Unit, how to implement?
+
+//        auto jacGdet = jac(G).det();
+//        auto EfoldElimination = jacGdet;//.val();
+//        auto EfoldElimination = (m_eps-jac(G).det()).ppartval();//.val();
+
+        gsConstantFunction<T> lambda1(m_lambda1, d);
+        gsConstantFunction<T> lambda2(m_lambda2, d);
+        auto lam1 = m_evaluator.getVariable(lambda1);
+        auto lam2 = m_evaluator.getVariable(lambda2);
+
+        gsConstantFunction<T> penaltyFactor(1e20, d);
+        auto penaF = m_evaluator.getVariable(penaltyFactor);
+
+        auto Ewinslow = (jac(G) % jac(G))/jac(G).det();
+//        auto Ewinslow2 = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+        auto Euniform = pow(jac(G).det(),2);
+//        gsDebugVar(m_eps);
+        auto EimprovePtReal = lam1 * Ewinslow + lam2 * Euniform;
+
+
+//        if jac(G).det() < 0, then indicator = 1; otherwise indicator = 0
+//        auto indicator = (-jac(G).det()).ppartval()/(1e-20-(-(jac(G).det()).ppartval()));
+//        auto indicator2 = -jac(G).det().ppartval()/(1e-20-((jac(G).det()).ppartval()));
+
+        auto indicator =  heaviside(jac(G).det());
+        auto indicatorNot = heaviside(-jac(G).det());
+        auto EimprovePt = indicator * EimprovePtReal + indicatorNot * penaF;
+
+        // 这里需要一个指示函数，目前只对不为0的部分做测试
+//        gsConstantFunction<T> lambda1(-0.5, d);
+//        auto lam1 = m_evaluator.getVariable(lambda1);
+//        auto EfoldElimination = jac(G).det();
+//        gsVector<T> pt(2);
+//        pt.setConstant(0.3);
+//        gsDebugVar(m_evaluator.eval(indicator, pt));
+//        gsDebugVar(m_evaluator.eval(indicator2, pt));
+//        gsDebugVar(m_evaluator.eval(EimprovePt, pt));
+//
+//        gsDebugVar(m_evaluator.eval(Ewinslow2, pt));
+//        gsDebugVar(m_evaluator.eval(m_eps-jac(G).det(), pt));
+
+//        auto EfoldElimination = jac(G).det() * jac(G).det(); // for test purpose
+        F = m_evaluator.integral(EimprovePt);
+
+//          F=0;
+        // Here, what is the meaning?
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_evaluator.getVariable(lambda1);
+//        auto lam2 = m_evaluator.getVariable(lambda2);
+
+        // Q: here, need some extra calculation?
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Euniform = gismo::expr::pow(jac(G).det(), 2);// or pow(jac(G).det() / S - 1,2) --> what is S?
+
+        // if (d==2)
+//        F = m_evaluator.integral(lam1 * Ewinslow.val() + lam2 * Euniform);
+
+        // else if (d==3)
+
+        return F;
+    }
+
+    void gradObj_into(const gsAsConstVector<T> &u, gsAsVector<T> &result) const {
+        gsMultiPatch<T> mp = m_mp;
+        this->convert_design_to_mp(u, mp);
+        geometryMap G = m_assembler.getMap(mp);
+
+        space space = m_assembler.getSpace(m_mb, d); // 1D space!!
+        space.setupMapper(m_mapper);
+
+//        gsConstantFunction<T> lambda1(m_lambda1, d);
+//        gsConstantFunction<T> lambda2(m_lambda2, d);
+//        auto lam1 = m_assembler.getCoeff(lambda1);
+//        auto lam2 = m_assembler.getCoeff(lambda2);
+
+//      |J|' w.r.t. physical coordinates x and y
+        auto derJacDet = jac(space) % jac(G).tr().adj();
+
+        // TODO:下面这行先这么写，回头修改掉(出于效率考虑)，引入新的expression？
+//        auto indicator = (m_eps-jac(G).det()).ppartval()/(1e-12-(m_eps-jac(G).det()).ppartval());
+//        auto E_der = indicator * derJacDet;
+
+        auto Ewinslow = (jac(G) % jac(G))/jac(G).det();
+        auto derEwinslow = 2.0/jac(G).det()*(jac(space)%jac(G))-Ewinslow.val()/jac(G).det() * derJacDet;
+        auto derEuniform = 2.0*jac(G).det()*derJacDet;
+
+        gsConstantFunction<T> lambda1(m_lambda1, d);
+        gsConstantFunction<T> lambda2(m_lambda2, d);
+        auto lam1 = m_evaluator.getVariable(lambda1);
+        auto lam2 = m_evaluator.getVariable(lambda2);
+
+        gsMatrix<T> PF(1,1);
+        PF<<1e20;
+        gsConstantFunction<T> penaltyFactor(PF, d);
+        auto penaF = m_evaluator.getVariable(penaltyFactor);
+
+//        gsDebugVar(penaF);
+
+        auto derEimprovePt = m_lambda1*derEwinslow+m_lambda2 * derEuniform;
+
+        // 这里加标量, 加不上去
+//        auto indicator = (-jac(G).det()).ppartval()/(1e-20-(-(jac(G).det()).ppartval()));
+//        auto indicator2 = -jac(G).det().ppartval()/(1e-20-((jac(G).det()).ppartval()));
+//        auto derEimprovePt = derEimprovePtReal * indicator2  ;
+
+//        auto indicator =  heaviside(jac(G).det());
+//        auto indicatorNot = heaviside(-jac(G).det());
+//        auto derEimprovePt = derEimprovePtReal*indicator + ;
+
+//        auto derEimprovePt2 = penaF * indicator;
+//        auto derEimprovePt = derEimprovePt1+derEimprovePt2;
+//
+//        gsDebugVar(derEimprovePt.rows());
+//        gsDebugVar(derEimprovePt.cols());
+
+//        gsVector<T> pt(2);
+//        pt.setConstant(0.5);
+//        gsDebugVar(m_evaluator.eval(indicator, pt));
+//        gsDebugVar(m_evaluator.eval(indicator2, pt));
+//        gsDebugVar(m_evaluator.eval(derEimprovePt, pt));
+//        gsDebugVar(m_evaluator.eval(test, pt));
+//        gsDebugVar(m_evaluator.eval(E_der, pt));
+
+//     现在看来可能是这里有问题？？跟Hugo讨论一下！
+        m_assembler.initSystem();
+        m_assembler.assemble( derEimprovePt);
+//        gsDebugVar(m_assembler.matrix());
+        result = gsAsVector<T>(const_cast<T *>(m_assembler.rhs().data()), m_assembler.rhs().rows());
+
+//        // CHECK INVERSES OF jac(G)
+//        auto JTG = (jac(space) % jac(G));//.tr(); // transpose to switch to rowSpace
+//        auto JiG = (jac(space) % jac(G).inv());//.tr(); // transpose to switch to rowSpace
+//        auto J_prime = jac(G).det() * JiG;
+//        auto Ewinslow = (jac(G).tr() * jac(G)).trace() / jac(G).det();
+//        auto Ewinslow_der1 = (2.0 / jac(G).det()) * JTG;//
+//        auto Ewinslow_der2 = -(Ewinslow.val() / jac(G).det()) * J_prime;
+//        auto Ewinslow_der = Ewinslow_der1 + Ewinslow_der2;
+//        auto Euniform_der = 2.0 / pow(S, 2) * (jac(G).det().val() - S.val()) * J_prime;
+//
+//        // To evaluate expressions at the point 'pt', use the following
+////        gsVector<T> pt(2);
+////        pt.setConstant(0.5);
+////        gsDebugVar(m_evaluator.eval(G, pt));
+////        gsDebugVar(m_evaluator.eval(jac(space), pt));
+////        gsDebugVar(m_evaluator.eval(jac(G), pt));
+////        gsDebugVar(m_evaluator.eval(JTG, pt));
+////        gsDebugVar(JTG.Space);
+////        gsDebugVar(m_evaluator.eval(JiG, pt));
+////        gsDebugVar(JiG.Space);
+////
+////        gsDebugVar(m_evaluator.eval(J_prime, pt));
+////
+////        gsDebugVar(m_evaluator.eval(Ewinslow, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der1, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der2, pt));
+////        gsDebugVar(m_evaluator.eval(Ewinslow_der, pt));
+////        gsDebugVar(m_evaluator.eval(Euniform_der, pt));
+//
+//        m_assembler.initSystem();
+//        m_assembler.assemble(m_lambda1 * Ewinslow_der + m_lambda2 * Euniform_der);
+//        result = gsAsVector<T>(const_cast<T *>(m_assembler.rhs().data()), m_assembler.rhs().rows());
+    }
+
+protected:
+    void convert_design_to_mp(const gsAsConstVector<T> &u, gsMultiPatch<T> &mp) const {
+        // Make the geometry
+        index_t idx;
+        for (size_t i = 0; i != mp.nPatches(); i++) {
+            for (size_t c = 0; c != mp.targetDim(); c++) {
+                for (index_t k = 0; k != m_mapper.patchSize(i, c); k++)
+
+                    // if it is possible to just loop over the free index
+                    // since this function is called very often during optimization
+                    if (m_mapper.is_free(k, i, c)) {
+                        idx = m_mapper.index(k, i, c);
+                        mp.patch(i).coefs()(k, c) = u[idx];
+                    }
+            }
+        }
+    }
+
+    gsVector<T> convert_mp_to_gsvec(const gsMultiPatch<T> &mp) const {
+        // TODO: Now, it just set all free variables into the vector u
+        // I will integrate it with the initialization step
+
+        gsVector<T> currentDesign(m_mapper.freeSize());
+
+        index_t idx;
+        for (size_t i = 0; i != mp.nPatches(); i++) {
+            for (size_t c = 0; c != mp.targetDim(); c++) {
+                for (index_t k = 0; k != m_mapper.patchSize(i, c); k++)
+                    // if it is possible to just loop over the free index
+                    // since this function is called very often during optimization
+                    if (m_mapper.is_free(k, i, c)) {
+                        idx = m_mapper.index(k, i, c);
+                        currentDesign(idx) = mp.patch(i).coefs()(k, c);
+                    }
+            }
+        }
+
+        return currentDesign;
+    }
+
+protected:
+    gsMultiPatch<T> m_mp;
+    gsDofMapper m_mapper;
+    index_t m_patchID;
+
+    gsMultiBasis<T> m_mb;
+
+    mutable gsExprEvaluator<T> m_evaluator;
+    mutable gsExprAssembler<T> m_assembler;
+
+    gsOptionList m_options;
+    T m_lambda1, m_lambda2;
+
+
+    /// Number of design variables
+    using Base::m_numDesignVars;
+
+    /// Number of constraints
+    using Base::m_numConstraints;
+
+    /// Number of nonzero entries in the Constraint Jacobian
+    using Base::m_numConJacNonZero;
+
+    /// Lower bounds for the design variables
+    using Base::m_desLowerBounds;
+
+    /// Upper bounds for the design variables
+    using Base::m_desUpperBounds;
+
+    /// Lower bounds for the constraints
+    using Base::m_conLowerBounds;
+
+    /// Upper bounds for the constraints
+    using Base::m_conUpperBounds;
+
+    /// Constraint Jacobian non-zero entries rows
+    using Base::m_conJacRows;
+
+    /// Constraint Jacobian non-zero entries columns
+    using Base::m_conJacCols;
+
+    /// Current design variables (and starting point )
+    using Base::m_curDesign;
+
+    mutable gsMatrix<T> m_allBasisVal;
+    mutable gsMatrix<T> m_allBasis1stDervs;
+    mutable gsMatrix<T> m_allBasis2ndDervs;
+    mutable gsMatrix<T> m_gaussWts;
+    mutable gsMatrix<index_t> m_gaussIdx;
+
+    T m_eps; // need to handle later, set m_eps = 0.05*S
+};
+
+
+
 // It is a barrier function-based method. The main step ff
 template<short d, typename T>
 class gsParameterization2DExample : public gsPatchGenerator<T> {
@@ -439,8 +1049,8 @@ public:
         //sanityCheckInput
 
         m_area = computeArea();
-        //m_eps = 0.05 * m_area; // ATTENTION!!
-        m_eps = 0.0 * m_area;
+        m_eps = 0.05 * m_area; // ATTENTION!!
+//        m_eps = 0.0 * m_area;
 
         ///*gsDebug << &m_bRep.basis(0)->knots() << "\n";*/
 
@@ -861,9 +1471,9 @@ public:
         /// Step 2: evalute basis functions with its 1st and 2nd derivates at all integration points
         m_mp.basis(0).eval_into(gaussPts, m_allBasisVal);
 
-        /*gsDebug << "xxxxxxxxxxxxxxxxxxxxxxx" << "\n";
-        gsDebug << m_allBasisVal << "\n";
-        gsDebug << "Size of allBasisVal = " << m_allBasisVal.rows() << "x" << m_allBasisVal.cols() << "\n";*/
+//        gsDebug << "xxxxxxxxxxxxxxxxxxxxxxx" << "\n";
+//        gsDebug << m_allBasisVal << "\n";
+//        gsDebug << "Size of allBasisVal = " << m_allBasisVal.rows() << "x" << m_allBasisVal.cols() << "\n";
 
         m_mp.basis(0).deriv_into(gaussPts, m_allBasis1stDervs);
 
@@ -1161,14 +1771,14 @@ public:
     }
 
     void solve() {
-        // Eliminate foldovers
-        ElimFoldovers();
-
-        // Further impove the parameterization quality
-        ImprovePts();
-
-        // Push the result into the resulting parameterization (multi-patch)
-        convert_vec_to_mp(X, m_mp);
+//        // Eliminate foldovers
+//        ElimFoldovers();
+//
+//        // Further impove the parameterization quality
+//        ImprovePts();
+//
+//        // Push the result into the resulting parameterization (multi-patch)
+//        convert_vec_to_mp(X, m_mp);
 
         // scaled Jacobian
         gsMultiBasis<T> mb(m_mp);
@@ -1214,7 +1824,6 @@ public:
                     }
             }
         }
-
         return currentDesign;
     }
 
@@ -1232,6 +1841,7 @@ public:
 
 public:
     std::vector<double> X;     // current geometry
+    mutable gsMultiPatch<T> m_mp;
 
 private:
 
@@ -1286,7 +1896,7 @@ private:
     gsDofMapper m_mapper;
 
     const gsMultiPatch<T> m_bRep;
-    mutable gsMultiPatch<T> m_mp;
+//    mutable gsMultiPatch<T> m_mp;
 
     mutable gsMatrix<T> m_allBasisVal;
     mutable gsMatrix<T> m_allBasis1stDervs;
@@ -1303,11 +1913,9 @@ private:
 };
 //#endif
 
-
 int main(int argc, char *argv[]) {
 
     //////////////////// STEP 1: read a boundary represention (B-Rep) file /////////////////
-
     bool save = false;
     index_t method = 0;
     real_t tol = 1e-10;
@@ -1317,6 +1925,7 @@ int main(int argc, char *argv[]) {
     // TODO: give some different cases as defalut benchmarks,
     //       otherwise deal with the input filename
     std::string filename_input("breps/2D/duck_boundary.xml");
+//    std::string filename_input("breps/2D/puzzle4_bdry.xml");
     std::string filename_output("results");
 
     // Read input from command line arguments
@@ -1355,31 +1964,31 @@ int main(int argc, char *argv[]) {
     /////////////////////////////////////// STEP 2: eliminate foldovers ////////////////////////////////
 
     gsParameterization2DExample<2, real_t> opt(bRep, method, plot_init);
-
+//    return 0;
     // gsHLBFGS<real_t> hlbfgs(opt);
 
     // TODO: scale the computational domain for better numerical stability, using the area?
-    gsDebug << "Area of computational domain is " << opt.computeArea() << "\n";
-
-    gsStopwatch stopwatch;
-    opt.preComputeBasis();
-    gsInfo << "running time : " << stopwatch.stop() << "\n";
+//    gsDebug << "Area of computational domain is " << opt.computeArea() << "\n";
+//
+//    gsStopwatch stopwatch;
+//    opt.preComputeBasis();
+//    gsInfo << "running time : " << stopwatch.stop() << "\n";
 
     std::vector<real_t> initU = opt.convert_mp_to_vec();
 
 //    gsInfo << "Inital Guess = " << initU << "\n";
-    return 0;
 
-    gsDebug << "value of objective function is: " << opt.evalObj(gsAsConstVector<real_t>(initU.data(), initU.size()))
-            << "\n";
+//    gsDebug << "value of objective function is: " <<
+//            opt.evalObj(gsAsConstVector<real_t>(initU.data(), initU.size())) << "\n";
+//    return 0;
 
     opt.X = opt.convert_mp_to_vec();
 
-    //gsInfo << "initU1 (std::vector) = " << "\n";
-    /*for (index_t i = 0; i != opt.X.size(); i++)
-    {
-    gsInfo << opt.X[i] << "\n";
-    }*/
+//    gsDebug << "initU1 (std::vector) = " << "\n";
+//    for (index_t i = 0; i != opt.X.size(); i++)
+//    {
+//    gsInfo << opt.X[i] << "\n";
+//    }
 
     //gsDebug << opt.X.size() << initU.size() << "\n";
     /*gsVector<real_t> grads(initU.size());
@@ -1411,23 +2020,83 @@ int main(int argc, char *argv[]) {
     gsDebug << resultNum(i) << "  " << trash[i] << "\n";*/
 
     gsDofMapper mapper = opt.mapper();
-    gsObjInterFreeFunc<2, real_t> obj(opt.outputResult(), mapper, 1e-2);
+    gsObjInterFreeFunc<2, real_t> obj(opt.outputResult(), mapper, 1e-1);
 
-    gsDebugVar(obj.evalObj(opt.X));
+//    gsDebugVar(obj.evalObj(opt.X));
+//
+//    std::vector<real_t> res(opt.numDofs());
+//    gsAsVector<real_t> result(res);
+//    obj.gradObj_into(opt.X, result);
+//    gsDebugVar(result.size());
+//    gsDebugVar(result.transpose());
+//    gsVector<real_t> res1 (result);
 
-    std::vector<real_t> res(opt.numDofs());
-    gsAsVector<real_t> result(res);
-    obj.gradObj_into(opt.X, result);
-    gsDebugVar(result.size());
-    gsDebugVar(result);
+//    gsAsVector<real_t> result2(res);
+//    obj.gradObj2_into(opt.X, result2);
+//    gsDebugVar(result2.size());
+//    gsDebugVar(result2.transpose());
+//    gsVector<real_t> res2 (result2);
+//
+//    // why?? all zeros??
+////    gsAsVector<real_t> diff(res);
+////    diff = result-result2;
+////    gsDebugVar(diff.transpose());
+//
+//    gsDebugVar((res1-res2).cwiseAbs().transpose()/res1.norm());
+//    gsDebug<<((res1-res2).norm()/res1.norm() < 1e-6 ? "passed" : "failed" )<<"\n";
+
+    gsHLBFGS<real_t> optimizer(&obj);
+    // check inital guess
+    gsStopwatch stopwatch2;
+    optimizer.solve(gsAsVector<real_t>(initU));
+    gsInfo << "running time : " << stopwatch2.stop() << "\n";
 
 
-//return 0;
+    std::vector<real_t> currDesign(mapper.freeSize());
+    for (auto it = 0; it != currDesign.size(); it++)
+        currDesign[it] = optimizer.currentDesign()(it);
+//    optimizer.currentDesign();
+//    gsDebugVar(currDesign);
+
+//    for (index_t i = 0; i != currDesign.size(); i++){
+//    gsInfo << currDesign[i] << "\n";
+//    }
+//    gsInfo<<"          \n\n\n";
+
+    gsObjQualityImprovePt<2, real_t> objImprove(opt.outputResult(), mapper, 1e-1);
+//    gsDebugVar(objImprove.evalObj(currDesign));
+
+//    std::vector<real_t> res(opt.numDofs());
+//    gsAsVector<real_t> result(res);
+//    objImprove.gradObj_into(currDesign, result);
+//    gsDebugVar(result.size());
+//    gsDebugVar(result.transpose());
+//    gsVector<real_t> res1 (result);
+//
+//    gsAsVector<real_t> result2(res);
+//    objImprove.gradObj2_into(currDesign, result2);
+//    gsDebugVar(result2.size());
+//    gsDebugVar(result2.transpose());
+//    gsVector<real_t> res2 (result2);
+//
+//    gsDebugVar((res1-res2).cwiseAbs().transpose()/res1.norm());
+//    gsDebug<<((res1-res2).norm()/res1.norm() < 1e-6 ? "passed" : "failed" )<<"\n";
+
+    gsHLBFGS<real_t> optimizer2(&objImprove);
+    // check inital guess
+    gsStopwatch stopwatch3;
+    optimizer2.solve(gsAsVector<real_t>(currDesign));
+    gsInfo << "running time : " << stopwatch3.stop() << "\n";
+
+    std::vector<real_t> currDesignF(mapper.freeSize());
+    for (auto it = 0; it != currDesignF.size(); it++)
+        currDesignF[it] = optimizer2.currentDesign()(it);
+//    return 0;
 
 //    gsStopwatch stopwatch;
     //bool success = opt.compute();
 //	opt.solve();
-    gsDebug << "running time : " << stopwatch.stop() << "\n";
+//    gsDebug << "running time : " << stopwatch.stop() << "\n";
 
     /*gsInfo << "inital guess = " << initU << "\n";
     gsInfo << "optimal X = " << "\n";
@@ -1442,7 +2111,6 @@ int main(int argc, char *argv[]) {
     else
     std::cerr << "FAIL TO UNTANGLE!" << std::endl;*/
 
-
     //--------------------------------------------------------------------------------------------------
 
     ///////////////////// STEP 3: improving the quality of parameterization ///////////////////////////
@@ -1456,16 +2124,35 @@ int main(int argc, char *argv[]) {
 
     // TODO: other formats? To make it easy to visulization
 
+    opt.convert_vec_to_mp(currDesignF,opt.m_mp);
     gsMultiPatch<> mp = opt.outputResult();
+    opt.solve();
 
-    gsFileData<> fd;
-    fd << mp;
-    fd.save(filename_output);
-    gsInfo << "Wrote G+Smo file:     " << filename_output << ".xml \n";
+//    gsMultiPatch<> mp;
+//    index_t idx;
+//    for (size_t i = 0; i != mp.nPatches(); i++) {
+//        for (size_t c = 0; c != mp.targetDim(); c++) {
+//            for (index_t k = 0; k != mapper.patchSize(i, c); k++)
+//
+//                // if it is possible to just loop over the free index
+//                // since this function is called very often during optimization
+//                if (mapper.is_free(k, i, c)) {
+//                    idx = mapper.index(k, i, c);
+//                    mp.patch(i).coefs()(k, c) = currDesignF[idx];
+//                }
+//        }
+//    }
+//
+//    gsDebug << mp.patch(0).coefs() << "\n";
 
-    gsWriteParaview(mp, "mp", 1000, true, true);
-
-    gsWrite(mp, filename_output);
+//    gsFileData<> fd;
+//    fd << mp;
+//    fd.save(filename_output);
+//    gsInfo << "Wrote G+Smo file:     " << filename_output << ".xml \n";
+//
+//    gsWriteParaview(mp, "mp", 1000, true, true);
+//
+//    gsWrite(mp, filename_output);
     //--------------------------------------------------------------------------------------------------
 
     ////////////////////////////////////// STEP 5: VISUALIZATION ///////////////////////////////////////
