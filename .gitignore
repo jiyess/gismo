@@ -30,4 +30,5 @@ CMakeFiles/
 # paraview result files
 *.vtp
 *.pvd
+*.vts
 

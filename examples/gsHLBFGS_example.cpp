@@ -98,6 +98,7 @@ public:
         convert_gsFreeVec_to_mp<T>(u, m_mapper, mp);
         geometryMap G = m_assembler.getMap(mp);
 
+        // TODO: can the following two lines move outside this function
         space space = m_assembler.getSpace(m_mb, d); // 1D space!!
         space.setupMapper(m_mapper);
 
@@ -114,14 +115,14 @@ public:
     }
 
 protected:
-    gsMultiPatch<T> m_mp;
-    gsMultiBasis<T> m_mb;
-    gsDofMapper m_mapper;
+    const gsMultiPatch<T> m_mp;
+    const gsMultiBasis<T> m_mb;
+    const gsDofMapper m_mapper;
 
     mutable gsExprEvaluator<T> m_evaluator;
     mutable gsExprAssembler<T> m_assembler;
 
-    T m_eps; // need to handle later, set m_eps = 0.05*S
+    const T m_eps; // need to handle later, set m_eps = 0.05*S
 };
 
 template<short_t d, typename T>
@@ -143,7 +144,7 @@ public:
             m_lambda1(lambda1),
             m_lambda2(lambda2) {
         m_assembler.setIntegrationElements(m_mb);
-        space u = m_assembler.getSpace(m_mb, d); // 1D space!!
+//        space u = m_assembler.getSpace(m_mb, d); // 1D space!!
         m_evaluator = gsExprEvaluator<T>(m_assembler);
     }
 
@@ -186,9 +187,9 @@ public:
         auto derJacDet = jac(space) % jac(G).tr().adj();
 
         // TODO: are there a mass of redundant computation. If yes, how to avoid it?
-        auto Ewinslow = jac(G).sqNorm() / jac(G).det();
-        auto derEwinslow = 2.0 / jac(G).det() * (jac(space) % jac(G)) - Ewinslow.val() / jac(G).det() * derJacDet;
-        auto derEuniform = 2.0 * jac(G).det() * derJacDet;
+        auto Ewinslow = jac(G).sqNorm() / meas(G);
+        auto derEwinslow = 2.0 / meas(G) * (jac(space) % jac(G)) - Ewinslow.val() / meas(G) * derJacDet;
+        auto derEuniform = 2.0 * meas(G) * derJacDet;
 
         auto derEimprovePt = m_lambda1 * derEwinslow + m_lambda2 * derEuniform;
 
@@ -198,18 +199,18 @@ public:
     }
 
 protected:
-    gsMultiPatch<T> m_mp;
-    gsMultiBasis<T> m_mb;
-    gsDofMapper m_mapper;
+    const gsMultiPatch<T> m_mp;
+    const gsMultiBasis<T> m_mb;
+    const gsDofMapper m_mapper;
 
     mutable gsExprEvaluator<T> m_evaluator;
     mutable gsExprAssembler<T> m_assembler;
 
-    T m_lambda1, m_lambda2;
+    const T m_lambda1, m_lambda2;
 };
 
 // It is a barrier function-based method. The main step ff
-template<short d, typename T>
+template<short_t d, typename T>
 class gsBarrierMethod : public gsPatchGenerator<T> {
 //    typedef typename gsExprEvaluator<T>::geometryMap geometryMap;
     typedef gsExprAssembler<>::geometryMap geometryMap;
@@ -223,17 +224,18 @@ public:
             m_bRep(bRep),
             m_method(method),
             m_plot_init(plot_init) {
-        GISMO_ASSERT(d == 2, "This method is only available for d==2");
+        GISMO_ENSURE(d == 2, "This method is only available for d==2");
         // TODO: assign m_mp by using initialization
 
         //sanityCheckInput
+        gsMatrix<T> boundingBox;
+        m_bRep.boundingBox(boundingBox);
 
-        initialization();
-        m_mb = gsMultiBasis<T>(m_mp);
-        makeMapper();
+        m_boundingBoxLeftBottomCorner = boundingBox.col(0).transpose();
+        auto boundingBoxRightTopCorner = boundingBox.col(1).transpose();
 
-        m_area = computeArea();
-        m_eps = 0.05 * m_area; // ATTENTION!!
+        for (auto idim = 0; idim != d; idim++)
+            m_scalingVec(idim) = m_boxsize / (boundingBoxRightTopCorner(idim) - m_boundingBoxLeftBottomCorner(idim));
     }
 
 public:
@@ -266,7 +268,6 @@ public:
 
                 //gsInfo << "Using cross approximation construction.\n";
                 //gsCrossApPatch<T> cross(m_bRep);
-                //gsDebug << "xxxxxxxxxxxxxxxxxxx" << "\n";
                 //gsInfo << "Created a " << cross.compute() << "\n";
                 ////if (save) gsWrite(spring.result(), "result_patch");
                 //m_mp.addPatch(cross.result());
@@ -275,17 +276,17 @@ public:
                 //break;
             }
             case 3: {
-                // consturt a parameterization with the inner control points all equal to (0, 0)
-
-                gsInfo << "Set all the inner control points to origin of coordinates.\n";
+                // construct a parameterization with the inner control points all equal to (0, 0)
+                gsInfo << "Set all the inner control points to a same point.\n";
                 gsCoonsPatch<T> coons(m_bRep);
                 coons.compute();
                 m_mp.addPatch(coons.result());
 
+                makeMapper();
                 gsVector<T> initialZeros(m_mapper.freeSize());
+                initialZeros.setConstant(m_boxsize / 2.0);
                 convert_gsFreeVec_to_mp(initialZeros, m_mapper, m_mp);
                 gsInfo << "Created a same point Patch." << "\n";
-
             }
             case 4: {
                 // Smoothness energy method
@@ -335,6 +336,27 @@ public:
         gsInfo << "#Numb of total variables is " << m_mapper.size() << "\n";
     }
 
+    void scalingBRep() {
+        for (auto ibdry = 0; ibdry != m_bRep.nPatches(); ibdry++)
+            for (auto idim = 0; idim != m_bRep.targetDim(); idim++) {
+                for (auto idof = 0; idof != m_bRep.patch(ibdry).coefsSize(); idof++) {
+                    m_bRep.patch(ibdry).coef(idof, idim) = (m_bRep.patch(ibdry).coef(idof, idim)
+                                                            - m_boundingBoxLeftBottomCorner(idim)) * m_scalingVec(idim);
+                }
+            }
+    }
+
+    void scalingUndo() {
+        for (auto iptch = 0; iptch != m_mp.nPatches(); iptch++) {
+            for (auto idim = 0; idim != m_mp.targetDim(); idim++) {
+                for (auto idof = 0; idof != m_mapper.patchSize(iptch, idim); idof++) {
+                    m_mp.patch(iptch).coef(idof, idim) = m_mp.patch(iptch).coef(idof, idim) / m_scalingVec(idim)
+                                                         + m_boundingBoxLeftBottomCorner(idim);
+                }
+            }
+        }
+    }
+
     T computeArea() {
         // compute the area of the computational domain by B-Rep
         // using the following Green's formulation:
@@ -344,7 +366,7 @@ public:
 
         // Here, one must take care of the orientation of the boundary curves
         // I found there exist some files get negative values of area
-        // We should make this part more robust!! make it indenpent of boundary orientation
+        // We should make this part more robust!! make it independent of boundary orientation
         // make some pre-check? or just get the absolute value of the result?
 
         // Or if the opposite (like NS and WE) boundary curves always with the same direction?
@@ -360,27 +382,42 @@ public:
     }
 
     const gsGeometry<T> &compute() final {
-        /////////////////////////// STEP 2: Foldovers Elimination Step ///////////////////////////////
+        gsStopwatch stopwatch;
+        // STEP 0: scale the computational domain for better numerical stability
+        scalingBRep();
+
+        // STEP 1: Initial guess construction
+        initialization();
+        m_mb = gsMultiBasis<T>(m_mp);
+        makeMapper();
+
+        m_area = computeArea();
+        m_eps = 0.05 * m_area; // ATTENTION!! 这里或许可以放到STEP 2里面
+
+        // STEP 2: Foldovers Elimination Step
         gsVector<T> initU = convert_mp_to_gsFreeVec<T>(m_mp, m_mapper);
 
-        gsObjInterFreeFunc<2, real_t> obj(m_mp, m_mapper, m_eps);
+        gsObjInterFreeFunc<d, T> obj(m_mp, m_mapper, m_eps);
 
-        gsHLBFGS<real_t> optimizer(&obj);
-        // check inital guess
-        gsStopwatch stopwatch;
+        gsHLBFGS<T> optimizer(&obj);
+        optimizer.options().setReal("MinGradientLength", 1e-12);
+        optimizer.options().setReal("MinStepLength", 1e-12);
+        // check initial guess
         optimizer.solve(initU);
 
-        ///////////////////// STEP 3: improving the quality of parameterization ///////////////////////////
-        //// Another optimization problem
-        gsObjQualityImprovePt<2, real_t> objImprove(m_mp, m_mapper, 1.0, 1.0 / std::pow(m_area, 2));
-
-        gsHLBFGS<real_t> optimizer2(&objImprove);
+        // STEP 3: parameterization quality improvement
+        gsObjQualityImprovePt<d, T> objImprove(m_mp, m_mapper, 1.0, 1.0 / std::pow(m_area, 2));
+        gsHLBFGS<T> optimizer2(&objImprove);
+        optimizer2.options().setReal("MinGradientLength", 1e-4);
+        optimizer2.options().setReal("MinStepLength", 1e-4);
         optimizer2.solve(optimizer.currentDesign());
         gsInfo << "running time : " << stopwatch.stop() << "\n";
 
+        // STEP 4: undo scaling to output result
         convert_gsFreeVec_to_mp<T>(optimizer2.currentDesign(), m_mapper, m_mp);
-        //--------------------------------------------------------------------------------------------------
+        scalingUndo();
 
+        // STEP 5: output results
         outputResult();
         return m_mp.patch(0);
     }
@@ -389,8 +426,8 @@ public:
 
         m_evaluator.setIntegrationElements(m_mb);
         geometryMap G = m_evaluator.getMap(m_mp);
-        GISMO_ENSURE(m_mp.nPatches() == 1, "Does not yet work for multipatch, "
-                                           "but multipatch has " << m_mp.nPatches() << " patches");
+        GISMO_ENSURE(m_mp.nPatches() == 1, "Does not yet work for multi-patch, "
+                                           "but multi-patch has " << m_mp.nPatches() << " patches");
 
         // resulting mesh
         index_t numSamples(1000);
@@ -407,6 +444,7 @@ public:
         // Frobenius condition number
         auto metric_FrobCondNum = jac(G).sqNorm() / meas(G);
         m_evaluator.writeParaview(metric_FrobCondNum, G, "metric_FrobCondNum");
+
     }
 
 private:
@@ -422,23 +460,25 @@ private:
     T m_area; // area of computational domain
     T m_eps; // parameter need for foldover elimination step
 
-    index_t m_method;
-    bool m_plot_init;
+    const index_t m_method;
+    const bool m_plot_init;
+
+    const T m_boxsize = 1.0;
+    gsVector<T, d> m_boundingBoxLeftBottomCorner;
+    gsVector<T, d> m_scalingVec;
 };
 
 int main(int argc, char *argv[]) {
-
-    //////////////////// STEP 1: read a boundary represention (B-Rep) file /////////////////
+    //////////////////// STEP 1: read a boundary representation (B-Rep) file /////////////////
     bool save = false;
-    index_t method = 0;
+    index_t method = 1;
     real_t tol = 1e-10;
     bool plot_init = false;
 
-    // Load XML file containing the boundary represention
-    // TODO: give some different cases as defalut benchmarks,
-    //       otherwise deal with the input filename
+    // Load XML file containing the boundary representation (B-Rep)
     std::string filename_input("breps/2D/duck_boundary.xml");
-//    std::string filename_input("breps/2D/puzzle4_bdry.xml");
+//    std::string filename_input("breps/2D/butterfly_bdry.xml");
+//    std::string filename_input("breps/2D/puzzle3_bdry.xml");
     std::string filename_output("results");
 
     // Read input from command line arguments
@@ -449,35 +489,50 @@ int main(int argc, char *argv[]) {
     cmd.addPlainString("input", "Name of the input file containing boundary data", filename_input);
     cmd.addString("o", "output", "Name of the output file", filename_output);
     cmd.addInt("m", "method", "Method: 0 Coons' patch (default), 1 Spring patch, 2: Cross-Ap. patch", method);
-    cmd.addReal("t", "tolerance", "Tolerance for identifing patch interfaces", tol);
+    cmd.addReal("t", "tolerance", "Tolerance for identifying patch interfaces", tol);
     cmd.addSwitch("save", "Save result in XML format", save);
-    cmd.addSwitch("plotInit", "Plot resulting initaialization for Paraview", plot_init);
+    cmd.addSwitch("plotInit", "Plot resulting initialization for Paraview", plot_init);
     try { cmd.getValues(argc, argv); }
     catch (int rv) { return rv; }
     //! [Parse command line]
 
-    // Load XML file
-    gsMultiPatch<real_t> bRep;
-    gsReadFile<>(filename_input, bRep);
-    GISMO_ENSURE(!bRep.empty(), "The gsMultiPatch is empty - maybe file is missing or corrupt.");
+    // Load XML file - boundary representation (B-Rep)
+    //! [Read geometry]
+    if (!gsFileManager::fileExists(filename_input)) {
+        gsWarn << "The file cannot be found!\n";
+        return EXIT_FAILURE;
+    }
+
+    gsInfo << "Read file \"" << filename_input << "\"\n";
+
+    gsMultiPatch<real_t>::uPtr bRep = gsReadFile<>(filename_input);
+    gsInfo << " Got" << *bRep << " \n";
+    //! [Read geometry]
 
     // TODO: At present， we need the input B-Rep is ordered by (W->E->N->S),
     //  make it more robust and available to whatever the order of B-Rep curves
 
     /////////////////////////////////////// STEP 2: eliminate foldovers ////////////////////////////////
-    gsBarrierMethod<2, real_t> opt(bRep, method, plot_init);
-    opt.compute();
-
-    // TODO: scale the computational domain for better numerical stability, using the area?
+    gsBarrierMethod<2, real_t> opt(*bRep, method, plot_init);
+    gsMultiPatch<real_t> result = opt.compute();
 
     ///////////////////////////// STEP 4: output the resulting parameterization ////////////////////////
     // writing the resulting parameterization to a G+Smo .xml file
-    // filename_output is a string. The extention .xml is added automatically
-    // TODO: other formats? To make it easy to visulization
+    // filename_output is a string. The extension .xml is added automatically
+    // TODO: other formats? Make it easy for visualization
 
     ////////////////////////////////////// STEP 5: VISUALIZATION ///////////////////////////////////////
     // TODO: visualization, in MATLAB first? then ?
     // GNUPLOT, looks good; a MATLAB plot style
+
+    //! [Write geometry]
+    // writing a G+Smo .xml file
+    gsFileData<> fd;
+    fd << result;
+    // output is a string. The extension .xml is added automatically
+    fd.save(filename_output);
+    gsInfo << "Wrote G+Smo file:     " << filename_output << ".xml \n";
+    //! [Write geometry]
 
     return EXIT_SUCCESS;
 }

@@ -1,6 +1,12 @@
 /** @file gsBarrierPatch.h
 
-    @brief XXXXXXXX
+    @brief - A reference implementation of the following paper.
+	If you make use of the code or the idea/algorithm in your work, please cite our paper
+	Ji, Y., Yu, Y. Y., Wang, M. Y., & Zhu, C. G. (2021).
+	Constructing high-quality planar NURBS parameterization for
+	isogeometric analysis by adjustment control points and weights.
+	Journal of Computational and Applied Mathematics, 396, 113615.
+	(https://www.sciencedirect.com/science/article/pii/S0377042721002375)
 
     This file is part of the G+Smo library. 
 
@@ -8,7 +14,7 @@
     License, v. 2.0. If a copy of the MPL was not distributed with this
     file, You can obtain one at http://mozilla.org/MPL/2.0/.
     
-    Author(s): XXXXXXXX
+    Author(s): Ye Ji (jiye@mail.dlut.edu.cn)
 */
 
 #pragma once
